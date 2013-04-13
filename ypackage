@@ -1,0 +1,396 @@
+#!/usr/bin/perl
+#
+# ypackage.pl
+# loic@yeplaa.net
+#
+######################################################################
+# v1.00
+######################################################################
+
+use lib '/usr/lib/ypackage';
+use JSON;
+use Switch;
+use Display;
+#use IO::File;
+use Log;
+use Git::Repository;
+use File::Path;
+our $outil = 'ypackage';
+our $version = 'v1.00';
+my $dir_outil = "/images/".$outil;
+my $project_outil = $dir_outil."/project/";
+my $db_outil = $dir_outil."/db/";
+my $log_outil = $dir_outil."/log/";
+my $log_system = "$log_outil"."system.log";
+my $signaturedb = $db_outil."signature.json";
+my $url = "git://10.10.1.5/";
+
+#-----------------------------------------------------------------------------------#
+#MAIN										    #
+#-----------------------------------------------------------------------------------#
+# ouverture du Fichier de LOG
+my $today = `date '+%Y%m%d' `;
+#Format yyyymmdd
+chomp $today;
+#if (open (LOG1,">>$log_system")) {
+#@output = Log::printlog("ypackage", "INFO", "Debut Execution script");
+#print LOG1 (@output);
+#close (LOG1);
+#}
+Display::banner;
+read_tty ();
+
+#-----------------------------------------------------------------------------------#
+#Fonctions										    #
+#-----------------------------------------------------------------------------------#
+#
+sub read_tty
+{
+  my @tty;
+  my $size;
+  @tty = Display::prompt;
+  $size = @tty;
+#print "tty size $size \n";
+#print "tty essai : $tty[0] \n";
+  switch ($tty[0])
+    {
+      case "banner"
+      {
+	banner ();
+      }
+      case "help"
+      {
+	help ();
+      }
+      case "package.install"
+      {
+	package_install ($tty[1], $tty[2]);
+      }
+      case "package.list"
+      {
+	package_list ();
+      }
+      case "package.update"
+      {
+	package_update ($tty[1], $tty[2]);
+      }
+# case "package.remove" { package.remove() ; }
+      case "environment.create"
+      {
+	environment_create ();
+      }
+      case "quit"
+      {
+	quit ();
+      }
+      else
+      {
+	print "Vous n'avez pas entrez de valeur correct\n";
+	read_tty ();
+      }
+    }
+}
+
+
+sub help
+{
+
+  my @list_commandes;
+  @list_commandes = ('banner', 'help', 'package.install <package name> [version|continu]','package.list', 'package.update <package name> [all]','package.remove <package name>', 'environment.create', 'quit');
+  Display::output_standard (@list_commandes);
+  read_tty ();
+}
+
+sub environment_create
+{
+  mkpath ($db_outil);
+  mkpath ($project_outil);
+  mkpath ($log_outil);
+
+  my %signature;
+  $signature{'ypackage'}=
+  {
+  name =>'ypackage',
+  version =>$version,
+  download =>'OK',
+  install =>'OK',
+  date =>$today,};
+
+  json_write (%signature);
+
+  Display::output_standard('Environnement initialise.Vous pouvez installer des packages');
+  if (open (LOG1, ">>$log_system"))
+    {
+      @output = Log::printlog ("ypackage", "INFO", "Creation environnement");
+      print LOG1 (@output);
+      close (LOG1);
+    }
+  read_tty ();
+}
+
+sub package_list
+{
+
+  environment_check ();
+  Display::output_standard ('Packages installees');
+  my %data = json_read ();
+  print "+----------------+---------------+----------+----------+----------+\n";
+  print "| Package        | Version / Tag | Download |  Install |  Date    |\n";
+  print "+----------------+---------------+----------+----------+----------+\n";
+  foreach my $key (keys % data)
+  {
+    my $pkg_version = %{$data{$key}}->{"version"};
+    my $pkg_download = %{$data{$key}}->{"download"};
+    my $pkg_install = %{$data{$key}}->{"install"};
+    my $pkg_date = %{$data{$key}}->{"date"};
+    print "| $key\t | $pkg_version\t |    $pkg_download    |    $pkg_install    | $pkg_date |\n";
+    print "+----------------+---------------+----------+----------+----------+\n";
+  }
+#print "essai : " . $data{YPackages}->{'version'};
+  read_tty ();
+}
+
+sub package_install
+{
+  my ($package_name, $package_version) = @_;
+  Display::output_standard ('Package install');
+  environment_check ();
+  if ((not defined $package_name) or (length $package_name == 0))
+    {
+      Display::output_standard ('Package non defini');
+    exit}
+  if ((not defined $package_version) || (length $package_version == 0))
+    {
+      $package_version = "continu";
+    }
+
+  print ("Paquet $package_name : $package_version\n");
+  Display::output_standard ('Est-ce correct : yes / no');
+  @valid = Display::read;
+
+  if (($tty[0] = "yes") || ($tty[0] = "y"))
+    {
+      my %packages = json_read ();
+      print "Package en cours de telechargement..\n\n";
+      my $package_source = "$url"."$package_name".".git";
+      my $dir_dest = "$project_outil"."$package_name"."/";
+      my $resultat = git_clone ($package_source, $dir_dest);
+      if (my $resultat != 0)
+	{
+	  print "=> Package non telecharge \n";
+	  $packages{$package_name}=
+	  {
+	  name =>$package_name,
+	  version =>$package_version,
+	  download =>"KO", 
+	  install =>"KO", 
+	  date =>$today,};
+	}
+      else
+	{
+	  print "=> Package telecharge\n";
+
+	  my $resultat = package_deploy ($dir_dest, $package_name);
+#	  my %packages = json_read ();
+	  if ($resultat != 0)
+	    {
+	      print "=> Package installe avec erreur\n";
+
+	      $packages{$package_name}=
+	      {
+	      name =>$package_name,
+	      version =>$package_version,
+	      download =>"OK", 
+	      install =>"KO", 
+	      date =>$today,};
+	    }
+	  else
+	    {
+	      print "package_name : $package_name\n";
+	      $packages{$package_name}=
+	      {
+	      name =>$package_name,
+	      version =>$package_version,
+	      download =>"OK",
+	      install =>"OK",
+	      date =>$today,};
+	      print "=> Package installe avec succes\n";
+	    }
+	}
+
+      json_write (%packages);
+      print "=> Package enregistre\n";
+
+    }
+
+  read_tty ();
+}
+
+sub package_update
+{
+  my ($package_name, $package_version) = @_;
+  Display::output_standard ('Package Update');
+  environment_check ();
+  if ((not defined $package_name) or (length $package_name == 0))
+    {
+      Display::output_standard ('Package non defini');
+    exit}
+  if ((not defined $package_version) || (length $package_version == 0))
+    {
+      $package_version = "continu";
+    }
+# Ajouter check du package
+
+#
+  print ("Paquet $package_name : $package_version\n");
+  Display::output_standard ('Est-ce correct : yes / no');
+  @valid = Display::read;
+
+  if (($tty[0] = "yes") || ($tty[0] = "y"))
+    {
+      print "Check des updates disponibles...\n\n";
+      my $package_source = "$url"."$package_name".".git";
+      my $dir_dest = "$project_outil"."$package_name"."/";
+      my $resultat = git_pull ($package_source, $dir_dest);
+      if ($resultat == 1)
+	{
+	  print "=> Package non installe\n";
+	exit 0;
+        }
+      if ($resultat == 2)
+	{
+	  print "=> Pas de mise à jour a faire\n";
+	exit 0;
+         }
+      print "=> Package telecharge\n";
+
+      $resultat = package_deploy ($dir_dest);
+      my % packages = json_read ();
+      if ($resultat != 0)
+	{
+	  print "=> Package installe avec erreur\n";
+
+	  $packages{$package_name}=
+	  {
+	  name =>$package_name,
+	  version =>$package_version,
+	  download =>"OK",
+          install =>"KO",
+	  date =>$today,};
+	}
+      else
+	{
+	  $packages{$package_name}=
+	  {
+	  name =>$package_name,
+	  version =>$package_version,
+	  download =>"OK",
+	  install =>"OK",
+	  date =>$today,};
+	  print "=> Package installe avec succes\n";
+	}
+
+      json_write (%packages);
+      print "=> Package enregistre\n";
+
+    }
+
+  read_tty ();
+}
+
+sub environment_check
+{
+
+  if (!-e $signaturedb)
+    {
+      Display::output_standard ('Environnement non initialise','Utiliser la commande environment.create');
+      exit 
+    };
+}
+
+sub json_read
+{
+  my $json;
+  {
+    local $ /;
+#Enable 'slurp' mode
+    open my $fh,"<","$signaturedb";
+    $json = <$fh>;
+    close $fh;
+  }
+  my $package = JSON->new->decode($json);
+  %packages = %$package;
+  return %packages;
+}
+
+sub json_write
+{
+  my %package = @_;
+  open FILE,">","$signaturedb";
+  my $json = JSON->new->allow_nonref;
+  my $jsonw = $json->encode(\%package);
+  print FILE $jsonw;
+  close FILE;
+}
+
+sub git_clone
+{
+  my ($url, $dir) = @_;
+#my $url="git://10.10.1.5/gyeplaa.git";
+#my $dir="/images/ypackage/project/gyeplaa/";
+# start from a repository reachable from the current directory
+#my  $r = Git::Repository->new();
+  mkpath ($dir);
+
+# or clone from a URL first
+  Git::Repository->
+  run (clone =>$url, $dir);
+  $r = Git::Repository->new (work_tree =>$dir);
+  if ($? !=0)
+    {
+      print "Probleme de connexion. Verifier la connexion au serveur git\n";
+      return 1;
+    }
+  return 0;
+}
+
+sub git_pull
+{
+  my ($url, $dir) = @_;
+  $r = Git::Repository->new (work_tree =>$dir);
+  $output = $r->run (pull);
+  if ($? != 0)
+    {
+      print "Probleme de connexion. Verifier la connexion au serveur git\n";
+      return 1;
+    }
+#    my $toto=defined($output);
+  if ($output =~ /up-to-date/)
+    {
+      return 2;
+    }
+    else
+    {
+      return 0;
+    }
+}
+
+sub package_deploy
+{
+  my ($dir, $package) = @_;
+#rmtree($dir);
+  my $script = "$dir"."install.sh";
+  my $log_package = "$log_outil"."$package"."_deploy_"."$today".".log";
+  my $cnt = chmod 0750, $script;
+  my $tmp = `$script &>$log_package `;
+  my $retscript = "$?";
+  print "ret : $retscript \n";
+  print "Log $log_package cree\n";
+#exec "$cmd 1>stdout.text 2>stderr.txt" or die "Unable to exec $cmd: $!\n";
+  return $retscript;
+}
+
+sub quit
+{
+  exit;
+}
