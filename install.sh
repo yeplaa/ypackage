@@ -10,13 +10,17 @@
 
 BIN_PATH=/usr/bin
 LIB_PATH=/usr/lib
+CONF_PATH=/etc
 
 #### Main ####
 
 umask 027
 
-cp ypackage $BIN_PATH/.
+cp SOURCE/ypackage $BIN_PATH/.
 chmod 750 $BIN_PATH/ypackage
 
-cp -pR lib/ypackage $LIB_PATH/.
+cp -R SOURCE/lib/ypackage $LIB_PATH/.
 chmod -R 750 $LIB_PATH/ypackage
+
+cp SOURCE/ypackage.cnf $CONF_PATH/.
+chmod 750 $CONF_PATH/ypackage.cnf

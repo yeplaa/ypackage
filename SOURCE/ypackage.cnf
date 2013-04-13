@@ -1,0 +1,6 @@
+# ypackage.cnf
+# loic@yeplaa.net
+#
+
+$outil		= "YepPackages";
+$version 	= "1.0";
