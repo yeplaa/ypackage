@@ -1,15 +1,17 @@
 #!/bin/sh
 #
+# install.sh
 # loic@yeplaa.net
 #
 ######################################################################
-#              
-#
+# v1.00 : Installation de ypackage multi-plateforme
 ######################################################################
 #### Declaration des variables ####
 
 BIN_PATH=/usr/bin
 LIB_PATH=/usr/lib
+
+#### Main ####
 
 umask 027
 

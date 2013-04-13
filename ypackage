@@ -11,7 +11,6 @@ use lib '/usr/lib/ypackage';
 use JSON;
 use Switch;
 use Display;
-#use IO::File;
 use Log;
 use Git::Repository;
 use File::Path;
@@ -26,7 +25,7 @@ my $signaturedb = $db_outil."signature.json";
 my $url = "git://10.10.1.5/";
 
 #-----------------------------------------------------------------------------------#
-#MAIN										    #
+#MAIN										    
 #-----------------------------------------------------------------------------------#
 # ouverture du Fichier de LOG
 my $today = `date '+%Y%m%d' `;
@@ -41,7 +40,7 @@ Display::banner;
 read_tty ();
 
 #-----------------------------------------------------------------------------------#
-#Fonctions										    #
+#Fonctions										    
 #-----------------------------------------------------------------------------------#
 #
 sub read_tty
@@ -50,8 +49,6 @@ sub read_tty
   my $size;
   @tty = Display::prompt;
   $size = @tty;
-#print "tty size $size \n";
-#print "tty essai : $tty[0] \n";
   switch ($tty[0])
     {
       case "banner"
@@ -191,7 +188,6 @@ sub package_install
 	  print "=> Package telecharge\n";
 
 	  my $resultat = package_deploy ($dir_dest, $package_name);
-#	  my %packages = json_read ();
 	  if ($resultat != 0)
 	    {
 	      print "=> Package installe avec erreur\n";
@@ -240,7 +236,7 @@ sub package_update
       $package_version = "continu";
     }
 # Ajouter check du package
-
+#
 #
   print ("Paquet $package_name : $package_version\n");
   Display::output_standard ('Est-ce correct : yes / no');
@@ -313,7 +309,6 @@ sub json_read
   my $json;
   {
     local $ /;
-#Enable 'slurp' mode
     open my $fh,"<","$signaturedb";
     $json = <$fh>;
     close $fh;
@@ -336,13 +331,8 @@ sub json_write
 sub git_clone
 {
   my ($url, $dir) = @_;
-#my $url="git://10.10.1.5/gyeplaa.git";
-#my $dir="/images/ypackage/project/gyeplaa/";
-# start from a repository reachable from the current directory
-#my  $r = Git::Repository->new();
   mkpath ($dir);
 
-# or clone from a URL first
   Git::Repository->
   run (clone =>$url, $dir);
   $r = Git::Repository->new (work_tree =>$dir);
@@ -364,7 +354,6 @@ sub git_pull
       print "Probleme de connexion. Verifier la connexion au serveur git\n";
       return 1;
     }
-#    my $toto=defined($output);
   if ($output =~ /up-to-date/)
     {
       return 2;
