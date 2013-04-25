@@ -371,7 +371,7 @@ sub package_deploy
   my $script = "$dir"."install.sh";
   my $log_package = "$log_outil"."$package"."_deploy_"."$today".".log";
   my $cnt = chmod 0750, $script;
-  my $tmp = `$script &>$log_package `;
+  my $tmp = `$script $dir &>$log_package `;
   my $retscript = "$?";
   print "ret : $retscript \n";
   print "Log $log_package cree\n";
